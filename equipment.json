@@ -1,0 +1,50 @@
+{
+  "back": {
+    "name": "🔙 СПИНА",
+    "items": {
+      "hammer_back": {
+        "name": "1. Хаммер на спину",
+        "photos": [
+          "AgACAgIAAxkBAAMsajEKoBrqdXDMGDuNPuGdetSXSzcAAvAdaxtBjJBJxWAIxcPsSrUBAAMCAAN5AAM8BA", "AgACAgIAAxkBAANuajIwXoWflNybttx-iaTWM2sQXRkAAnUcaxvv-5BJ2D91YzsgzZIBAAMCAAN5AAM8BA"
+        ],
+        "gifs": [
+          "CgACAgIAAxkBAAN4ajIw5ExOUXHcXGCGzUd0eLzNdn4AAgubAALv-5BJfSZKyluREog8BA"
+        ]
+      },
+      "lat_pulldown": {
+        "name": "2. Тяга верхнего блока",
+        "photos": [
+          "AgACAgIAAxkBAAM0ajEVw7u1EG5g11UQW-XubJowgzsAAhAeaxtBjJBJDilx3SOJibwBAAMCAAN5AAM8BA"
+        ],
+        "gifs": []
+      },
+      "low_row": {
+        "name": "3. Тяга нижнего блока",
+        "photos": [],
+        "gifs": []
+      }
+    }
+  },
+  "chest": {
+    "name": "🫁 ГРУДЬ",
+    "items": {
+      "bench_press": {
+        "name": "1. Жим лежа",
+        "photos": [],
+        "gifs": []
+      }
+    }
+  },
+  "arms": {
+    "name": "💪 РУКИ",
+    "items": {}
+  },
+  "legs": {
+    "name": "🦵 НОГИ",
+    "items": {}
+  },
+  "shoulders": {
+    "name": "🤸 ПЛЕЧИ",
+    "items": {}
+  }
+}

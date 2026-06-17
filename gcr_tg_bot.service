@@ -1,0 +1,14 @@
+[Unit]
+Description=GCR_APP Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/your_path/gcr_tg_bot
+ExecStart=/your_path/gcr_tg_bot/venv/bin/python /your_path/gcr_tg_bot/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
