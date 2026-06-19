@@ -4,6 +4,7 @@ import re
 import json
 import os
 import logging
+import time
 from datetime import datetime 
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv # Импорт библиотеки dotenv
@@ -228,6 +229,19 @@ def handle_contact(message):
 def cmd_status(message):
     send_status_message(message.chat.id)
 
+@bot.message_handler(commands=['mail'])
+def start_mailing(message):
+    chat_id = message.chat.id
+    
+    # Проверяем, является ли отправитель админом
+    if chat_id not in ADMIN_CHAT_IDS:
+        return # Если не админ - просто игнорируем команду
+        
+    msg = bot.send_message(chat_id, "📧 Введите текст рассылки или отправьте фото с подписью:")
+    # Перехватываем следующее сообщение админа
+    bot.register_next_step_handler(msg, process_mailing)
+
+
 # === ОБРАБОТЧИК НАЖАТИЙ НА INLINE КНОПКИ ===
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
@@ -309,6 +323,58 @@ def process_feedback(message):
 
     response = supabase.table(TABLE_NAME).select('full_name').eq('telegram_id', str(chat_id)).eq('gym_id', TARGET_GYM_ID).execute()
     user_name = response.data[0]['full_name'] if response.data else "Неизвестный клиент"
+
+
+# === Массовая рассылка ===
+def process_mailing(message):
+    admin_chat_id = message.chat.id
+    
+    # Определяем, что прислал админ (текст или фото)
+    if message.content_type == 'photo':
+        mailing_text = message.caption
+        photo_id = message.photo[-1].file_id
+    else:
+        mailing_text = message.text
+        photo_id = None
+        
+    # Если админ случайно нажал /start во время ожидания
+    if mailing_text and mailing_text.startswith('/'):
+        bot.send_message(admin_chat_id, "Рассылка отменена.")
+        return
+        
+    if not mailing_text and not photo_id:
+        bot.send_message(admin_chat_id, "Ошибка: сообщение пустое. Рассылка отменена.")
+        return
+        
+    bot.send_message(admin_chat_id, "⏳ Рассылка началась. Ожидайте...")
+    
+    # Достаем ВСЕХ клиентов этого зала, у которых есть telegram_id
+    response = supabase.table(TABLE_NAME).select('telegram_id').eq('gym_id', TARGET_GYM_ID).not_.is_('telegram_id', 'null').execute()
+    
+    success_count = 0
+    fail_count = 0
+    
+    for client in response.data:
+        tg_id = client.get('telegram_id')
+        if not tg_id:
+            continue
+            
+        try:
+            if photo_id:
+                bot.send_photo(tg_id, photo=photo_id, caption=mailing_text, parse_mode="HTML")
+            else:
+                bot.send_message(tg_id, mailing_text, parse_mode="HTML")
+            success_count += 1
+        except Exception as e:
+            fail_count += 1
+            logging.error(f"Не удалось отправить рассылку пользователю {tg_id}: {e}")
+            
+        # ВАЖНО: Пауза 0.05 сек, чтобы Телеграм не забанил бота за спам
+        time.sleep(0.05)
+        
+    # Отправляем админу отчет о завершении
+    bot.send_message(admin_chat_id, f"✅ Рассылка завершена!\n\nУспешно отправлено: {success_count}\nОшибок (заблокировали бота): {fail_count}")
+
 
     # =========================================================
     # === ВЫБОР ВАРИАНТА ОТПРАВКИ АДМИНУ ===
