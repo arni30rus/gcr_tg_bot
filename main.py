@@ -188,7 +188,7 @@ def send_welcome(message):
         markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         itembtn = telebot.types.KeyboardButton('📱 Отправить номер телефона', request_contact=True)
         markup.add(itembtn)
-        bot.send_message(chat_id, "Привет! Я бот фитнес-клуба. Для доступа к функциям привяжите карту клиента, отправьте боту ваш номер телефона нажав появившуюся кнопку ниже Отправить номер телефона", reply_markup=markup)
+        bot.send_message(chat_id, "Привет! Я бот фитнес-клуба. Для доступа к функциям привяжите карту клиента, отправьте боту ваш номер телефона нажав появившуюся кнопку ниже 📱 Отправить номер телефона", reply_markup=markup)
 
 
 @bot.message_handler(content_types=['contact'])
@@ -240,6 +240,25 @@ def start_mailing(message):
     msg = bot.send_message(chat_id, "📧 Введите текст рассылки или отправьте фото с подписью:")
     # Перехватываем следующее сообщение админа
     bot.register_next_step_handler(msg, process_mailing)
+
+# подсчет пользователей бота
+@bot.message_handler(commands=['users'])
+def get_users_count(message):
+    chat_id = message.chat.id
+    
+    # Проверяем, является ли отправитель админом
+    if chat_id not in ADMIN_CHAT_IDS:
+        return # Если не админ - игнорируем
+        
+    # Запрашиваем из базы только те строки, где telegram_id не пустой (not null)
+    # Метод .not_.is_('telegram_id', 'null') формирует запрос: WHERE telegram_id IS NOT NULL
+    response = supabase.table(TABLE_NAME).select('telegram_id').eq('gym_id', TARGET_GYM_ID).not_.is_('telegram_id', 'null').execute()
+    
+    # Считаем количество полученных записей
+    users_count = len(response.data)
+    
+    # Отправляем админу результат
+    bot.send_message(chat_id, f"👥 На данный момент к боту привязано пользователей: <b>{users_count}</b>", parse_mode="HTML")
 
 
 # === ОБРАБОТЧИК НАЖАТИЙ НА INLINE КНОПКИ ===
@@ -324,12 +343,44 @@ def process_feedback(message):
     response = supabase.table(TABLE_NAME).select('full_name').eq('telegram_id', str(chat_id)).eq('gym_id', TARGET_GYM_ID).execute()
     user_name = response.data[0]['full_name'] if response.data else "Неизвестный клиент"
 
+    # =========================================================
+    # === ВЫБОР ВАРИАНТА ОТПРАВКИ АДМИНУ ===
+    
+    # ВАРИАНТ 1: АНОНИМНО (Расскомментируйте, если нужно)
+    # admin_text = "📩 <b>Новое обращение (Анонимно):</b>\n\n"
+    
+    # ВАРИАНТ 2: С УКАЗАНИЕМ ФИО (По умолчанию включен)
+    admin_text = f"📩 <b>Новое обращение:</b>\n👤 От: <b>{user_name}</b> (ID: {chat_id})\n\n"
+    
+    # =========================================================
 
-# === Массовая рассылка ===
+    if feedback_text:
+        admin_text += f"Текст:\n{feedback_text}"
+    else:
+        admin_text += "(Без текста, только фото)"
+
+    # Отправляем ВСЕМ админам из списка ADMIN_CHAT_IDS
+    success = False
+    for admin_id in ADMIN_CHAT_IDS:
+        try:
+            if photo_id:
+                bot.send_photo(admin_id, photo=photo_id, caption=admin_text, parse_mode="HTML")
+            else:
+                bot.send_message(admin_id, admin_text, parse_mode="HTML")
+            success = True
+        except Exception as e:
+            logging.error(f"Ошибка отправки админу {admin_id}: {e}")
+    
+    if success:
+        bot.send_message(chat_id, "✅ Ваше сообщение успешно отправлено администрации! Спасибо за обращение.", reply_markup=get_main_menu_keyboard())
+    else:
+        bot.send_message(chat_id, "❌ Произошла ошибка при отправке. Обратитесь на ресепшен.", reply_markup=get_main_menu_keyboard())
+
+
+# === МАССОВАЯ РАССЫЛКА ===
 def process_mailing(message):
     admin_chat_id = message.chat.id
     
-    # Определяем, что прислал админ (текст или фото)
     if message.content_type == 'photo':
         mailing_text = message.caption
         photo_id = message.photo[-1].file_id
@@ -337,7 +388,6 @@ def process_mailing(message):
         mailing_text = message.text
         photo_id = None
         
-    # Если админ случайно нажал /start во время ожидания
     if mailing_text and mailing_text.startswith('/'):
         bot.send_message(admin_chat_id, "Рассылка отменена.")
         return
@@ -348,7 +398,6 @@ def process_mailing(message):
         
     bot.send_message(admin_chat_id, "⏳ Рассылка началась. Ожидайте...")
     
-    # Достаем ВСЕХ клиентов этого зала, у которых есть telegram_id
     response = supabase.table(TABLE_NAME).select('telegram_id').eq('gym_id', TARGET_GYM_ID).not_.is_('telegram_id', 'null').execute()
     
     success_count = 0
@@ -369,44 +418,9 @@ def process_mailing(message):
             fail_count += 1
             logging.error(f"Не удалось отправить рассылку пользователю {tg_id}: {e}")
             
-        # ВАЖНО: Пауза 0.05 сек, чтобы Телеграм не забанил бота за спам
         time.sleep(0.05)
         
-    # Отправляем админу отчет о завершении
     bot.send_message(admin_chat_id, f"✅ Рассылка завершена!\n\nУспешно отправлено: {success_count}\nОшибок (заблокировали бота): {fail_count}")
-
-
-    # =========================================================
-    # === ВЫБОР ВАРИАНТА ОТПРАВКИ АДМИНУ ===
-    
-    # ВАРИАНТ 1: АНОНИМНО
-    # admin_text = "📩 <b>Новое обращение (Анонимно):</b>\n\n"
-    
-    # ВАРИАНТ 2: С УКАЗАНИЕМ ФИО
-    admin_text = f"📩 <b>Новое обращение:</b>\n👤 От: <b>{user_name}</b> (ID: {chat_id})\n\n"
-    
-    # =========================================================
-
-    if feedback_text:
-        admin_text += f"Текст:\n{feedback_text}"
-    else:
-        admin_text += "(Без текста, только фото)"
-
-    success = False
-    for admin_id in ADMIN_CHAT_IDS:
-        try:
-            if photo_id:
-                bot.send_photo(admin_id, photo=photo_id, caption=admin_text, parse_mode="HTML")
-            else:
-                bot.send_message(admin_id, admin_text, parse_mode="HTML")
-            success = True
-        except Exception as e:
-            logging.error(f"Ошибка отправки админу {admin_id}: {e}")
-    
-    if success:
-        bot.send_message(chat_id, "✅ Ваше сообщение успешно отправлено администрации спортзала! Спасибо за обращение.", reply_markup=get_main_menu_keyboard())
-    else:
-        bot.send_message(chat_id, "❌ Произошла ошибка при отправке. Обратитесь на ресепшен.", reply_markup=get_main_menu_keyboard())
 
 
 # ===============================
