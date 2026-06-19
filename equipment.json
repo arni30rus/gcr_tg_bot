@@ -9,19 +9,22 @@
         ],
         "gifs": [
           "CgACAgIAAxkBAAN4ajIw5ExOUXHcXGCGzUd0eLzNdn4AAgubAALv-5BJfSZKyluREog8BA"
-        ]
+        ],
+        "videos": ["BAACAgIAAxkBAAIBhmo0-V6C_1PHVu7Kfki0Z5etcAIVAAKJqQACmEuoSYgaale08tRePAQ"]
       },
       "lat_pulldown": {
         "name": "2. Тяга верхнего блока",
         "photos": [
           "AgACAgIAAxkBAAM0ajEVw7u1EG5g11UQW-XubJowgzsAAhAeaxtBjJBJDilx3SOJibwBAAMCAAN5AAM8BA"
         ],
-        "gifs": []
+        "gifs": [],
+        "videos": []
       },
       "low_row": {
         "name": "3. Тяга нижнего блока",
         "photos": [],
-        "gifs": []
+        "gifs": [],
+        "videos": []
       }
     }
   },
@@ -31,7 +34,8 @@
       "bench_press": {
         "name": "1. Жим лежа",
         "photos": [],
-        "gifs": []
+        "gifs": [],
+        "videos": []
       }
     }
   },

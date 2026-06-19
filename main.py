@@ -144,6 +144,7 @@ def send_equipment_detail(chat_id, cat_key, item_key, prev_message_id):
     name = item.get('name', 'Без названия')
     photos = item.get('photos', [])
     gifs = item.get('gifs', [])
+    videos = item.get('videos', [])
     
     try:
         bot.edit_message_reply_markup(chat_id=chat_id, message_id=prev_message_id, reply_markup=None)
@@ -152,21 +153,53 @@ def send_equipment_detail(chat_id, cat_key, item_key, prev_message_id):
 
     back_keyboard = get_back_to_items_keyboard(cat_key)
     
-    if not photos and not gifs:
+    # Считаем общее количество медиафайлов
+    total_media = len(photos) + len(gifs) + len(videos)
+    
+    if total_media == 0:
         bot.send_message(chat_id, f"🏋️ <b>{name}</b>\n\n(Медиафайлы пока не добавлены)", parse_mode="HTML", reply_markup=back_keyboard)
         return
 
-    for i, photo_id in enumerate(photos):
-        caption = f"🏋️ <b>{name}</b>" if i == 0 else None
-        is_last = (i == len(photos) - 1) and not gifs
+    media_index = 0 # Счетчик отправленных файлов
+
+    # 1. Отправляем все фото
+    for photo_id in photos:
+        media_index += 1
+        caption = f"🏋️ <b>{name}</b>" if media_index == 1 else None
+        is_last = (media_index == total_media)
         keyboard = back_keyboard if is_last else None
         bot.send_photo(chat_id, photo=photo_id, caption=caption, parse_mode="HTML", reply_markup=keyboard)
 
-    for i, gif_id in enumerate(gifs):
-        caption = "🎬 Выполнение упражнения:" if (i == 0 and not photos) else None
-        is_last = (i == len(gifs) - 1)
+    # 2. Отправляем все гифки
+    for gif_id in gifs:
+        media_index += 1
+        if media_index == 1:
+            caption = f"🏋️ <b>{name}</b>"
+        elif media_index == len(photos) + 1:
+            caption = "🎬 Выполнение упражнения:"
+        else:
+            caption = None
+            
+        is_last = (media_index == total_media)
         keyboard = back_keyboard if is_last else None
         bot.send_animation(chat_id, animation=gif_id, caption=caption, reply_markup=keyboard)
+
+    # 3. Отправляем все видео
+    for vid_id in videos:
+        media_index += 1
+        if media_index == 1:
+            caption = f"🏋️ <b>{name}</b>"
+        elif media_index == len(photos) + len(gifs) + 1:
+            caption = "🎥 Видео упражнения:"
+        else:
+            caption = None
+            
+        is_last = (media_index == total_media)
+        keyboard = back_keyboard if is_last else None
+        
+        # ИСПРАВЛЕНО: используем video= вместо data=
+        bot.send_video(chat_id, video=vid_id, caption=caption, reply_markup=keyboard)
+
 
 # === ОБРАБОТЧИКИ СООБЩЕНИЙ ===
 def get_last_digits(phone_str, num_digits=10):
@@ -426,15 +459,19 @@ def process_mailing(message):
 # ===============================
 # ВРЕМЕННЫЙ КОД ДЛЯ СБОРА file_id, закомментировать после сбора всех id
 # ===============================
-#@bot.message_handler(content_types=['photo', 'animation'])
-#def get_file_id(message):
-#    if message.photo:
-        # Фото приходит в разных размерах, берем самое большое [-1]
-#        file_id = message.photo[-1].file_id
-#        bot.reply_to(message, f"📸 Photo file_id:\n{file_id}")
-#    elif message.animation:
-#        file_id = message.animation.file_id
-#        bot.reply_to(message, f"🎬 GIF file_id:\n{file_id}")
+
+@bot.message_handler(content_types=['photo', 'animation', 'video'])
+def get_file_id(message):
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        bot.reply_to(message, f"📸 Photo file_id:\n{file_id}")
+    elif message.animation:
+        file_id = message.animation.file_id
+        bot.reply_to(message, f"🎬 GIF file_id:\n{file_id}")
+    elif message.video:
+        file_id = message.video.file_id
+        bot.reply_to(message, f"🎥 Video file_id:\n{file_id}")
+
 
 
 # Запуск бота
