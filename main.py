@@ -460,17 +460,17 @@ def process_mailing(message):
 # ВРЕМЕННЫЙ КОД ДЛЯ СБОРА file_id, закомментировать после сбора всех id
 # ===============================
 
-@bot.message_handler(content_types=['photo', 'animation', 'video'])
-def get_file_id(message):
-    if message.photo:
-        file_id = message.photo[-1].file_id
-        bot.reply_to(message, f"📸 Photo file_id:\n{file_id}")
-    elif message.animation:
-        file_id = message.animation.file_id
-        bot.reply_to(message, f"🎬 GIF file_id:\n{file_id}")
-    elif message.video:
-        file_id = message.video.file_id
-        bot.reply_to(message, f"🎥 Video file_id:\n{file_id}")
+#@bot.message_handler(content_types=['photo', 'animation', 'video'])
+#def get_file_id(message):
+#    if message.photo:
+#        file_id = message.photo[-1].file_id
+#        bot.reply_to(message, f"📸 Photo file_id:\n{file_id}")
+#    elif message.animation:
+#        file_id = message.animation.file_id
+#        bot.reply_to(message, f"🎬 GIF file_id:\n{file_id}")
+#    elif message.video:
+#        file_id = message.video.file_id
+#        bot.reply_to(message, f"🎥 Video file_id:\n{file_id}")
 
 
 

@@ -4,19 +4,13 @@
     "items": {
       "hammer_back": {
         "name": "1. Хаммер на спину",
-        "photos": [
-          "AgACAgIAAxkBAAMsajEKoBrqdXDMGDuNPuGdetSXSzcAAvAdaxtBjJBJxWAIxcPsSrUBAAMCAAN5AAM8BA", "AgACAgIAAxkBAANuajIwXoWflNybttx-iaTWM2sQXRkAAnUcaxvv-5BJ2D91YzsgzZIBAAMCAAN5AAM8BA"
-        ],
-        "gifs": [
-          "CgACAgIAAxkBAAN4ajIw5ExOUXHcXGCGzUd0eLzNdn4AAgubAALv-5BJfSZKyluREog8BA"
-        ],
+        "photos": ["AgACAgIAAxkBAAMsajEKoBrqdXDMGDuNPuGdetSXSzcAAvAdaxtBjJBJxWAIxcPsSrUBAAMCAAN5AAM8BA"],
+        "gifs": ["CgACAgIAAxkBAAN4ajIw5ExOUXHcXGCGzUd0eLzNdn4AAgubAALv-5BJfSZKyluREog8BA" ],
         "videos": ["BAACAgIAAxkBAAIBhmo0-V6C_1PHVu7Kfki0Z5etcAIVAAKJqQACmEuoSYgaale08tRePAQ"]
       },
       "lat_pulldown": {
         "name": "2. Тяга верхнего блока",
-        "photos": [
-          "AgACAgIAAxkBAAM0ajEVw7u1EG5g11UQW-XubJowgzsAAhAeaxtBjJBJDilx3SOJibwBAAMCAAN5AAM8BA"
-        ],
+        "photos": ["AgACAgIAAxkBAAM0ajEVw7u1EG5g11UQW-XubJowgzsAAhAeaxtBjJBJDilx3SOJibwBAAMCAAN5AAM8BA"],
         "gifs": [],
         "videos": []
       },
