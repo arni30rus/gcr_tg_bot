@@ -25,7 +25,7 @@ TARGET_GYM_ID = os.getenv('TARGET_GYM_ID')
 admin_ids_str = os.getenv('ADMIN_CHAT_IDS', '')
 ADMIN_CHAT_IDS = [int(id.strip()) for id in admin_ids_str.split(',') if id.strip()]
 
-# Расшифровка типов абонементов
+# Расшифровка типов абонементов согласно базе в Supabase, ID - name из таблицы subscription_types
 SUB_TYPE_NAMES = {
     1: "VIP",
     2: "Дневной",
@@ -187,7 +187,8 @@ def send_welcome(message):
         markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         itembtn = telebot.types.KeyboardButton('📱 Отправить номер телефона', request_contact=True)
         markup.add(itembtn)
-        bot.send_message(chat_id, "Привет! Я бот фитнес-клуба. Для доступа к функциям привяжите карту, отправив ваш номер телефона.", reply_markup=markup)
+        bot.send_message(chat_id, "Привет! Я бот фитнес-клуба. Для доступа к функциям привяжите карту клиента, отправьте боту ваш номер телефона нажав появившуюся кнопку ниже Отправить номер телефона", reply_markup=markup)
+
 
 @bot.message_handler(content_types=['contact'])
 def handle_contact(message):
@@ -207,11 +208,19 @@ def handle_contact(message):
         return
 
     client_data = response.data[0]
-    supabase.table(TABLE_NAME).update({'telegram_id': str(chat_id)}).eq('id', client_data['id']).execute()
+    
+    # Генерируем текущее время в нужном формате (с микросекундами)
+    current_time_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+    
+    # Обновляем и telegram_id, и updated_at
+    supabase.table(TABLE_NAME).update({
+        'telegram_id': str(chat_id),
+        'updated_at': current_time_str
+    }).eq('id', client_data['id']).execute()
     
     bot.send_message(
         chat_id, 
-        f"Отлично, {client_data['full_name']}! Ваша карта зала успешно привязана. Выберите действие:", 
+        f"Отлично, {client_data['full_name']}! Ваша карта клиента зала успешно привязана. Выберите действие:", 
         reply_markup=get_main_menu_keyboard()
     )
 
@@ -329,7 +338,7 @@ def process_feedback(message):
             logging.error(f"Ошибка отправки админу {admin_id}: {e}")
     
     if success:
-        bot.send_message(chat_id, "✅ Ваше сообщение успешно отправлено администрации! Спасибо за обращение.", reply_markup=get_main_menu_keyboard())
+        bot.send_message(chat_id, "✅ Ваше сообщение успешно отправлено администрации спортзала! Спасибо за обращение.", reply_markup=get_main_menu_keyboard())
     else:
         bot.send_message(chat_id, "❌ Произошла ошибка при отправке. Обратитесь на ресепшен.", reply_markup=get_main_menu_keyboard())
 
