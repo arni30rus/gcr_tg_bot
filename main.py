@@ -7,7 +7,7 @@ import logging
 import time
 from datetime import datetime 
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from dotenv import load_dotenv # Импорт библиотеки dotenv
+from dotenv import load_dotenv
 
 # Загружаем переменные из файла .env
 load_dotenv()
@@ -15,29 +15,26 @@ load_dotenv()
 # Включаем логирование
 logging.basicConfig(level=logging.INFO)
 
-# === НАСТРОЙКИ (теперь берутся из .env) ===
+# === НАСТРОЙКИ ===
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY')
-TABLE_NAME = os.getenv('TABLE_NAME', 'clients') # по умолчанию 'clients', если в .env пусто
+TABLE_NAME = os.getenv('TABLE_NAME', 'clients')
 TARGET_GYM_ID = os.getenv('TARGET_GYM_ID')
 
-# Парсим список админов: берем строку из .env, делим по запятой, удаляем пробелы и переводим в числа (int)
 admin_ids_str = os.getenv('ADMIN_CHAT_IDS', '')
 ADMIN_CHAT_IDS = [int(id.strip()) for id in admin_ids_str.split(',') if id.strip()]
 
-# Расшифровка типов абонементов согласно базе в Supabase, ID - name из таблицы subscription_types
 SUB_TYPE_NAMES = {
-    1: "Дневной",
-    2: "Вечерний",
-    3: "Безлимитный",
+    1: "VIP",
+    2: "Дневной",
+    3: "Безлимит",
     4: "Льготный"
 }
 
 EQUIP_DB_PATH = 'equipment.json'
 GYM_INFO_PATH = 'gym_info.json'
 
-# Инициализация
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -55,7 +52,6 @@ def load_gym_info():
         return json.load(f)
 
 # === ФУНКЦИИ ГЕНЕРАЦИИ КЛАВИАТУР ===
-# ИЗМЕНЕНО: Добавлен параметр chat_id для проверки админа
 def get_guest_menu_keyboard(chat_id):
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(
@@ -63,7 +59,6 @@ def get_guest_menu_keyboard(chat_id):
         InlineKeyboardButton("🔗 Подключить клубную карту", callback_data="menu_connect"),
         InlineKeyboardButton("✉️ Жалобы и предложения", callback_data="menu_feedback")
     )
-    # Если пишет админ - добавляем кнопку команд
     if chat_id in ADMIN_CHAT_IDS:
         markup.add(InlineKeyboardButton("🛠 Команды", callback_data="admin_commands"))
     return markup
@@ -76,12 +71,10 @@ def get_client_menu_keyboard(chat_id):
         InlineKeyboardButton("🏋️ Тренажеры", callback_data="menu_equipment"),
         InlineKeyboardButton("✉️ Жалобы и предложения", callback_data="menu_feedback")
     )
-    # Если пишет админ - добавляем кнопку команд
     if chat_id in ADMIN_CHAT_IDS:
         markup.add(InlineKeyboardButton("🛠 Команды", callback_data="admin_commands"))
     return markup
 
-# НОВАЯ ФУНКЦИЯ: Автоматически выдает нужное меню
 def get_current_main_menu(chat_id):
     response = supabase.table(TABLE_NAME).select('telegram_id').eq('telegram_id', str(chat_id)).eq('gym_id', TARGET_GYM_ID).execute()
     if response.data:
@@ -94,6 +87,7 @@ def get_about_us_keyboard():
     markup.add(
         InlineKeyboardButton("🎟 Абонементы", callback_data="info_prices"),
         InlineKeyboardButton("🕒 График работы", callback_data="info_schedule"),
+        InlineKeyboardButton("🔥 Акции", callback_data="info_promos"), # НОВАЯ КНОПКА
         InlineKeyboardButton("🏋️ Тренеры", callback_data="info_trainers"),
         InlineKeyboardButton("⬅️ Назад в главное меню", callback_data="menu_main")
     )
@@ -122,13 +116,11 @@ def get_equipment_items_keyboard(cat_key):
     equip_db = load_equipment()
     items = equip_db.get(cat_key, {}).get('items', {})
     markup = InlineKeyboardMarkup(row_width=1)
-    
     if not items:
         markup.add(InlineKeyboardButton("Тренажеров пока нет", callback_data="none"))
     else:
         for item_key, item_data in items.items():
             markup.add(InlineKeyboardButton(item_data['name'], callback_data=f"item_{cat_key}_{item_key}"))
-            
     markup.add(InlineKeyboardButton("⬅️ Назад к мышцам", callback_data="menu_equipment"))
     return markup
 
@@ -145,11 +137,9 @@ def get_cancel_keyboard():
 # === ЛОГИКА СТАТУСА ===
 def send_status_message(chat_id):
     response = supabase.table(TABLE_NAME).select('*').eq('telegram_id', str(chat_id)).eq('gym_id', TARGET_GYM_ID).execute()
-    
     if not response.data:
-        bot.send_message(chat_id, "Вы еще не привязали карту к этому залу. Напишите /start")
+        bot.send_message(chat_id, "Вы еще не привязали карту к этому залу. Напишите /start и выберите пункт Подключить клубную карту")
         return
-        
     client = response.data[0]
     name = client.get('full_name', 'Клиент')
     sub_code = client.get('sub_type', 0)
@@ -173,7 +163,6 @@ def send_status_message(chat_id):
         status_emoji = "⚠️ Дата окончания не указана"
     
     display_date = end_date_str[:10] if end_date_str else "Не указана"
-    
     status_text = (
         f"🏋️‍♂️ <b>Статус вашего абонемента:</b>\n\n"
         f"👤 ФИО: {name}\n"
@@ -205,11 +194,9 @@ def send_info_section(chat_id, section_key, title, back_callback):
 def send_equipment_detail(chat_id, cat_key, item_key, prev_message_id):
     equip_db = load_equipment()
     item = equip_db.get(cat_key, {}).get('items', {}).get(item_key)
-    
     if not item:
         bot.send_message(chat_id, "Тренажер не найден.")
         return
-        
     name = item.get('name', 'Без названия')
     photos = item.get('photos', [])
     gifs = item.get('gifs', [])
@@ -221,15 +208,12 @@ def send_equipment_detail(chat_id, cat_key, item_key, prev_message_id):
         pass
 
     back_keyboard = get_back_to_items_keyboard(cat_key)
-    
     total_media = len(photos) + len(gifs) + len(videos)
-    
     if total_media == 0:
         bot.send_message(chat_id, f"🏋️ <b>{name}</b>\n\n(Медиафайлы пока не добавлены)", parse_mode="HTML", reply_markup=back_keyboard)
         return
 
     media_index = 0 
-
     for photo_id in photos:
         media_index += 1
         caption = f"🏋️ <b>{name}</b>" if media_index == 1 else None
@@ -245,7 +229,6 @@ def send_equipment_detail(chat_id, cat_key, item_key, prev_message_id):
             caption = "🎬 Выполнение упражнения:"
         else:
             caption = None
-            
         is_last = (media_index == total_media)
         keyboard = back_keyboard if is_last else None
         bot.send_animation(chat_id, animation=gif_id, caption=caption, reply_markup=keyboard)
@@ -258,7 +241,6 @@ def send_equipment_detail(chat_id, cat_key, item_key, prev_message_id):
             caption = "🎥 Видео упражнения:"
         else:
             caption = None
-            
         is_last = (media_index == total_media)
         keyboard = back_keyboard if is_last else None
         bot.send_video(chat_id, video=vid_id, caption=caption, reply_markup=keyboard)
@@ -272,77 +254,44 @@ def get_last_digits(phone_str, num_digits=10):
 def send_welcome(message):
     chat_id = message.chat.id
     response = supabase.table(TABLE_NAME).select('*').eq('telegram_id', str(chat_id)).eq('gym_id', TARGET_GYM_ID).execute()
-    
     if response.data:
-        bot.send_message(
-            chat_id, 
-            f"Привет, {response.data[0]['full_name']}! Выберите действие:", 
-            reply_markup=get_client_menu_keyboard(chat_id) # ИЗМЕНЕНО: передаем chat_id
-        )
+        bot.send_message(chat_id, f"С возвращением, {response.data[0]['full_name']}! Выберите действие:", reply_markup=get_client_menu_keyboard(chat_id))
     else:
-        bot.send_message(
-            chat_id, 
-            "Привет! Я бот фитнес-клуба. Здесь вы можете узнать о нас, подключить клубную карту или оставить обращение.\n\nВыберите действие:", 
-            reply_markup=get_guest_menu_keyboard(chat_id) # ИЗМЕНЕНО: передаем chat_id
-        )
+        bot.send_message(chat_id, "Привет! Я бот фитнес-клуба. Здесь вы можете узнать о нас, подключить клубную карту или оставить обращение.\n\nВыберите действие:", reply_markup=get_guest_menu_keyboard(chat_id))
 
 @bot.message_handler(content_types=['contact'])
 def handle_contact(message):
-    if message.contact is None:
-        return
-        
+    if message.contact is None: return
     chat_id = message.chat.id
     phone = message.contact.phone_number
     last_10_digits = get_last_digits(phone)
-    
     bot.send_message(chat_id, "Ищу ваш номер в базе клуба...", reply_markup=telebot.types.ReplyKeyboardRemove())
-
     response = supabase.table(TABLE_NAME).select('*').like('phone', f'%{last_10_digits}').eq('gym_id', TARGET_GYM_ID).execute()
-        
     if not response.data:
         bot.send_message(chat_id, "К сожалению, этот номер не найден в базе данного зала. Обратитесь на ресепшен.")
         return
-
     client_data = response.data[0]
-    
     current_time_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
-    
-    supabase.table(TABLE_NAME).update({
-        'telegram_id': str(chat_id),
-        'updated_at': current_time_str
-    }).eq('id', client_data['id']).execute()
-    
-    # ИЗМЕНЕНО: передаем chat_id
-    bot.send_message(
-        chat_id, 
-        f"Отлично, {client_data['full_name']}! Ваша карта клиента зала успешно привязана. Выберите действие:", 
-        reply_markup=get_client_menu_keyboard(chat_id)
-    )
+    supabase.table(TABLE_NAME).update({'telegram_id': str(chat_id), 'updated_at': current_time_str}).eq('id', client_data['id']).execute()
+    bot.send_message(chat_id, f"Отлично, {client_data['full_name']}! Ваша карта клиента зала успешно привязана. Выберите действие:", reply_markup=get_client_menu_keyboard(chat_id))
 
 # ===== КОМАНДЫ =====
-
 @bot.message_handler(commands=['status'])
 def cmd_status(message):
     send_status_message(message.chat.id)
 
 @bot.message_handler(commands=['mail'])
 def start_mailing(message):
-    chat_id = message.chat.id
-    if chat_id not in ADMIN_CHAT_IDS:
-        return
-        
-    msg = bot.send_message(chat_id, "📧 Введите текст рассылки или отправьте фото с подписью:")
+    if message.chat.id not in ADMIN_CHAT_IDS: return
+    msg = bot.send_message(message.chat.id, "📧 Введите текст рассылки или отправьте фото с подписью:")
     bot.register_next_step_handler(msg, process_mailing)
 
 @bot.message_handler(commands=['users'])
 def get_users_count(message):
-    chat_id = message.chat.id
-    if chat_id not in ADMIN_CHAT_IDS:
-        return
-        
+    if message.chat.id not in ADMIN_CHAT_IDS: return
     response = supabase.table(TABLE_NAME).select('telegram_id').eq('gym_id', TARGET_GYM_ID).not_.is_('telegram_id', 'null').execute()
     users_count = len(response.data)
-    bot.send_message(chat_id, f"👥 На данный момент к боту привязано пользователей: <b>{users_count}</b>", parse_mode="HTML")
+    bot.send_message(message.chat.id, f"👥 На данный момент к боту привязано пользователей: <b>{users_count}</b>", parse_mode="HTML")
 
 # === АДМИН-КОМАНДЫ ДЛЯ ОБНОВЛЕНИЯ JSON ===
 @bot.message_handler(commands=['prices'])
@@ -356,6 +305,13 @@ def cmd_edit_schedule(message):
     if message.chat.id not in ADMIN_CHAT_IDS: return
     msg = bot.send_message(message.chat.id, "🕒 Пришлите новый текст или фото для раздела «График работы»:")
     bot.register_next_step_handler(msg, process_update_info, "schedule")
+
+# НОВАЯ КОМАНДА ДЛЯ АКЦИЙ
+@bot.message_handler(commands=['promos'])
+def cmd_edit_promos(message):
+    if message.chat.id not in ADMIN_CHAT_IDS: return
+    msg = bot.send_message(message.chat.id, "🔥 Пришлите новый текст или фото для раздела «Акции»:")
+    bot.register_next_step_handler(msg, process_update_info, "promotions")
 
 def process_update_info(message, section_key):
     if message.content_type == 'photo':
@@ -371,22 +327,15 @@ def process_update_info(message, section_key):
         return
 
     info_db = load_gym_info()
-    if section_key not in info_db:
-        info_db[section_key] = {}
-        
     info_db[section_key] = {"type": info_type, "content": content, "caption": caption}
-    
     with open(GYM_INFO_PATH, 'w', encoding='utf-8') as f:
         json.dump(info_db, f, ensure_ascii=False, indent=4)
-
     bot.send_message(message.chat.id, f"✅ Раздел успешно обновлен!")
 
 # === УДОБНОЕ ПОЛУЧЕНИЕ file_id ДЛЯ АДМИНОВ ===
 @bot.message_handler(content_types=['photo', 'animation', 'video'])
 def admin_get_file_id(message):
-    if message.chat.id not in ADMIN_CHAT_IDS:
-        return
-        
+    if message.chat.id not in ADMIN_CHAT_IDS: return
     if message.photo:
         file_id = message.photo[-1].file_id
         bot.reply_to(message, f"📸 <b>Photo file_id:</b>\n\n<code>{file_id}</code>", parse_mode="HTML")
@@ -403,7 +352,6 @@ def callback_query(call):
     chat_id = call.message.chat.id
     data = call.data
     message_id = call.message.message_id
-    
     bot.answer_callback_query(call.id)
     
     def safe_edit_text(text, markup=None):
@@ -422,14 +370,12 @@ def callback_query(call):
         except:
             pass
 
-    #Отправка меню
     if data == "menu_main":
         try:
             msg_to_del = bot.send_message(chat_id, ".", reply_markup=telebot.types.ReplyKeyboardRemove())
             bot.delete_message(chat_id, msg_to_del.message_id)
         except:
             pass
-            
         safe_edit_text("Выберите действие:", get_current_main_menu(chat_id))
         
     elif data == "menu_about":
@@ -444,6 +390,11 @@ def callback_query(call):
         safe_edit_markup(None)
         send_info_section(chat_id, "schedule", "🕒 График работы", "menu_about")
         
+    # НОВЫЙ ОБРАБОТЧИК ДЛЯ АКЦИЙ
+    elif data == "info_promos":
+        safe_edit_markup(None)
+        send_info_section(chat_id, "promotions", "🔥 Акции", "menu_about")
+        
     elif data == "info_trainers":
         safe_edit_text("🏋️ Выберите тренера:", get_trainers_keyboard())
         
@@ -452,30 +403,23 @@ def callback_query(call):
         t_key = data[8:]
         info_db = load_gym_info()
         trainer = info_db.get("trainers", {}).get(t_key)
-        
         if not trainer:
             bot.send_message(chat_id, "Тренер не найден.")
             return
-            
         back_markup = InlineKeyboardMarkup()
         back_markup.add(InlineKeyboardButton("⬅️ Назад к тренерам", callback_data="info_trainers"))
-        
         name = trainer.get("name", "Тренер")
         desc = trainer.get("desc", "")
         photo_id = trainer.get("photo_id")
-        
         if photo_id:
             bot.send_photo(chat_id, photo=photo_id, caption=f"🏋️ <b>{name}</b>\n\n{desc}", parse_mode="HTML", reply_markup=back_markup)
         else:
             bot.send_message(chat_id, f"🏋️ <b>{name}</b>\n\n{desc}", parse_mode="HTML", reply_markup=back_markup)
 
-    # ==== Меню подключения  ====
     elif data == "menu_connect":
         back_markup = InlineKeyboardMarkup()
         back_markup.add(InlineKeyboardButton("⬅️ Назад в меню", callback_data="menu_main"))
-        
         safe_edit_text("Для привязки карты клиента нажмите кнопку «📱 Отправить номер телефона» внизу экрана.\n\nЕсли передумали — нажмите «Назад в меню».", back_markup)
-        
         markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         itembtn = telebot.types.KeyboardButton('📱 Отправить номер телефона', request_contact=True)
         markup.add(itembtn)
@@ -499,11 +443,7 @@ def callback_query(call):
     
     elif data == "menu_feedback":
         safe_edit_markup(None)
-        msg = bot.send_message(
-            chat_id, 
-            "✉️ Напишите ваше сообщение или отправьте фото с подписью. \n(Следующее сообщение будет передано администрации).", 
-            reply_markup=get_cancel_keyboard()
-        )
+        msg = bot.send_message(chat_id, "✉️ Напишите ваше сообщение или отправьте фото с подписью. \n(Следующее сообщение будет передано администрации).", reply_markup=get_cancel_keyboard())
         bot.register_next_step_handler(msg, process_feedback)
 
     elif data == "cancel_feedback":
@@ -525,18 +465,16 @@ def callback_query(call):
             item_key = parts[2]
             send_equipment_detail(chat_id, cat_key, item_key, message_id)
 
-    # === НОВОЕ: МЕНЮ КОМАНД АДМИНА ===
     elif data == "admin_commands":
-        # Защита: если нажал не админ (кнопку подкинули), игнорируем
-        if chat_id not in ADMIN_CHAT_IDS:
-            return
-            
+        if chat_id not in ADMIN_CHAT_IDS: return
+        # ОБНОВЛЕНО: Добавлено описание команды /promos
         admin_text = (
             "🛠 Команды администратора:\n\n"
             "📧 /mail — Массовая рассылка пользователям (текст или фото)\n"
             "👥 /users — Показать количество привязанных пользователей\n"
-            "🎟  /prices — Обновить раздел «Абонементы» (пришлите текст или фото)\n"
-            "🕒 /schedule— Обновить раздел «График работы» (пришлите текст или фото)\n\n"
+            "🎟  /prices — Обновить раздел «Абонементы»\n"
+            "🕒 /schedule — Обновить раздел «График работы»\n"
+            "🔥 /promos — Обновить раздел «Акции»\n\n"
             "📸 Получение file_id:\n"
             "Просто отправьте боту фото, гифку или видео, и он ответит их уникальным ID для вставки в JSON-файлы."
         )
@@ -547,18 +485,15 @@ def callback_query(call):
 # === ЛОГИКА ОБРАТНОЙ СВЯЗИ ===
 def process_feedback(message):
     chat_id = message.chat.id
-    
     if message.content_type == 'photo':
         feedback_text = message.caption
         photo_id = message.photo[-1].file_id
     else:
         feedback_text = message.text
         photo_id = None
-        
     if feedback_text and feedback_text.startswith('/'):
         bot.send_message(chat_id, "Процесс отменен.", reply_markup=get_current_main_menu(chat_id))
         return
-        
     if not feedback_text and not photo_id:
         bot.send_message(chat_id, "Пожалуйста, отправьте текст или фото. Попробуйте снова через меню.", reply_markup=get_current_main_menu(chat_id))
         return
@@ -566,15 +501,11 @@ def process_feedback(message):
     response = supabase.table(TABLE_NAME).select('full_name').eq('telegram_id', str(chat_id)).eq('gym_id', TARGET_GYM_ID).execute()
     user_name = response.data[0]['full_name'] if response.data else "Анонимный гость"
 
-    # =========================================================
-    # === ВЫБОР ВАРИАНТА ОТПРАВКИ АДМИНУ ===
-    
     # ВАРИАНТ 1: АНОНИМНО
     # admin_text = "📩 <b>Новое обращение (Анонимно):</b>\n\n"
     
-    # ВАРИАНТ 2: С УКАЗАНИЕМ ФИО (По умолчанию включен)
+    # ВАРИАНТ 2: С УКАЗАНИЕМ ФИО
     admin_text = f"📩 <b>Новое обращение:</b>\n👤 От: <b>{user_name}</b> (ID: {chat_id})\n\n"
-    # =========================================================
 
     if feedback_text:
         admin_text += f"Текст:\n{feedback_text}"
@@ -591,44 +522,33 @@ def process_feedback(message):
             success = True
         except Exception as e:
             logging.error(f"Ошибка отправки админу {admin_id}: {e}")
-    
     if success:
         bot.send_message(chat_id, "✅ Ваше сообщение успешно отправлено администрации! Спасибо за обращение.", reply_markup=get_current_main_menu(chat_id))
     else:
         bot.send_message(chat_id, "❌ Произошла ошибка при отправке. Обратитесь на ресепшен.", reply_markup=get_current_main_menu(chat_id))
 
-
 # === МАССОВАЯ РАССЫЛКА ===
 def process_mailing(message):
     admin_chat_id = message.chat.id
-    
     if message.content_type == 'photo':
         mailing_text = message.caption
         photo_id = message.photo[-1].file_id
     else:
         mailing_text = message.text
         photo_id = None
-        
     if mailing_text and mailing_text.startswith('/'):
         bot.send_message(admin_chat_id, "Рассылка отменена.")
         return
-        
     if not mailing_text and not photo_id:
         bot.send_message(admin_chat_id, "Ошибка: сообщение пустое. Рассылка отменена.")
         return
-        
     bot.send_message(admin_chat_id, "⏳ Рассылка началась. Ожидайте...")
-    
     response = supabase.table(TABLE_NAME).select('telegram_id').eq('gym_id', TARGET_GYM_ID).not_.is_('telegram_id', 'null').execute()
-    
     success_count = 0
     fail_count = 0
-    
     for client in response.data:
         tg_id = client.get('telegram_id')
-        if not tg_id:
-            continue
-            
+        if not tg_id: continue
         try:
             if photo_id:
                 bot.send_photo(tg_id, photo=photo_id, caption=mailing_text, parse_mode="HTML")
@@ -638,12 +558,9 @@ def process_mailing(message):
         except Exception as e:
             fail_count += 1
             logging.error(f"Не удалось отправить рассылку пользователю {tg_id}: {e}")
-            
         time.sleep(0.05)
-        
     bot.send_message(admin_chat_id, f"✅ Рассылка завершена!\n\nУспешно отправлено: {success_count}\nОшибок (заблокировали бота): {fail_count}")
 
-# Запуск бота
 if __name__ == '__main__':
     logging.info(f"Бот для зала ID {TARGET_GYM_ID} запущен (telebot)...")
     bot.infinity_polling()
