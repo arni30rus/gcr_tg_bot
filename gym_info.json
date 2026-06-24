@@ -1,0 +1,23 @@
+{
+    "prices": {
+        "type": "photo",
+        "content": "AgACAgIAAxkBAAICDWo7fym-P1vPXBUgn1-bkAVXhTImAALjGGsbotzhSVTP7dU0BJP9AQADAgADeQADPAQ",
+        "caption": ""
+    },
+    "schedule": {
+        "type": "text",
+        "content": "🕒 Пн-Пт: 08:00 - 22:00\n🕒 Сб-Вс: 10:00 - 22:00"
+    },
+    "trainers": {
+        "trainer1": {
+            "name": "Алексей",
+            "photo_id": "",
+            "desc": "Силовой фитнес, набор массы, похудение, восстановительные программы"
+        },
+        "trainer2": {
+            "name": "Александр",
+            "photo_id": "",
+            "desc": "Набор массы, снижение веса, растяжка"
+        }
+    }
+}
